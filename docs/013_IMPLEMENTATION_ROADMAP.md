@@ -63,3 +63,25 @@ conversation begin.
 - Indian broker API specifics (rate limits, historical depth, costs) — `005`.
 - India transaction-cost rates (STT, exchange charges, GST, stamp duty) for the paper cost model — `011` §3.
 - Swiss Ephemeris licensing if the project ever becomes distributed — `000` §3.
+
+---
+
+## Implementation status — updated (Month-2 layer shipped)
+
+The research loop is now **closed end-to-end and runs offline** (synthetic source → features →
+research engine → paper-trade → HTML report). Status against this roadmap:
+
+| Roadmap item | Status | Where |
+|---|---|---|
+| Collector persistence into DB (upserts) | ✅ done — idempotent `merge`, SQLite *or* Postgres | `db/repo.py`, `db/session.py` |
+| Agent 5 — Gann | ✅ done (pure-Python reference; C++ fast-path deferred) | `collectors/gann.py` |
+| Feature Factory (Agent 6) + leakage tests → **G2** | ✅ done, family-tagged, no-look-ahead guard | `features/factory.py` |
+| Research engine (baseline→augmented→ablation→correction→verdict) | ✅ done; answers RQ-004 | `research/engine.py` |
+| Multiple-testing (BH FDR) + Deflated Sharpe | ✅ done (self-contained, no scipy) | `research/stats.py` |
+| Paper-trading backend (**G5** gate) | ✅ done — post-cost ledger + reconciliation | `paper/engine.py` |
+| SHAP attribution; Reality-Check / SPA; PBO | ⏳ next | — |
+| Agent 2 (Options), Agent 3 (Economic vintages) | ⏳ next | — |
+| C++ fast-paths via pybind11 | ⏳ later (Python paths already run daily research) | `cpp/` |
+
+**Tests:** 44/44 green. The engine is verified in *both* directions — it detects a planted signal and
+returns the honest null on noise (the synthetic RQ-004 run reports `no_edge_found`, as it should).

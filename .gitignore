@@ -5,3 +5,9 @@ manifests/
 .venv/
 *.egg-info/
 .pytest_cache/
+# local research artifacts
+*.db
+astroquant.db
+research_report.html
+*.html
+!docs/**/*.html
