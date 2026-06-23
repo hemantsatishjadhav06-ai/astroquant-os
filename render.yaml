@@ -1,0 +1,29 @@
+# Render Blueprint — deploy the AstroQuant OS Discovery Lab as a web service.
+# Docs: https://render.com/docs/blueprint-spec
+#
+# Secure flow (no secrets in this file or in git):
+#   1) Push this repo to GitHub.
+#   2) Render → New → Blueprint → connect the repo. Render reads this file.
+#   3) Set any secrets (e.g. AQ_DB_URL for a managed Postgres) in the Render dashboard
+#      as environment variables — NEVER commit them.
+#
+# pyswisseph compiles a small C extension; if the native build fails, switch this service
+# to the bundled Dockerfile (Render → service → Settings → "Docker").
+
+services:
+  - type: web
+    name: astroquant-os
+    runtime: python
+    plan: free
+    buildCommand: "pip install -e .[api,data]"
+    startCommand: "uvicorn astroquant.api.app:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: AQ_BROKER
+        value: "nse"          # default live source for the lab (free)
+      - key: AQ_DB_URL
+        sync: false           # set a postgresql+psycopg://… URL in the dashboard for persistence
+      # Add broker/API keys here ONLY via the dashboard (sync:false), never in this file.

@@ -1,0 +1,11 @@
+.git
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+manifests
+*.db
+*.html
+!python/astroquant/api/**
+node_modules
+.env
