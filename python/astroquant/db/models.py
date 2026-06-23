@@ -20,7 +20,10 @@ class Base(DeclarativeBase):
 
 class Symbol(Base):
     __tablename__ = "symbols"
-    symbol_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    # BigInteger on Postgres; INTEGER on SQLite so the local file DB autoincrements the rowid PK.
+    symbol_id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True
+    )
     symbol: Mapped[str] = mapped_column(String, nullable=False)
     exchange: Mapped[str] = mapped_column(String, nullable=False)
     instrument: Mapped[str] = mapped_column(String, nullable=False)  # EQ/FUT/OPT/INDEX
@@ -101,7 +104,9 @@ class Hypothesis(Base):
 
 class Signal(Base):
     __tablename__ = "signals"
-    signal_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    signal_id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True
+    )
     hypothesis_id: Mapped[str | None] = mapped_column(ForeignKey("hypotheses.hypothesis_id"))
     name: Mapped[str | None] = mapped_column(String)
     family: Mapped[str | None] = mapped_column(String)    # technical/market/astro/gann/news/macro
