@@ -111,3 +111,22 @@ def record_signal(session: Session, **fields) -> Signal:
 
 def count_planetary_rows(session: Session) -> int:
     return int(session.execute(select(func.count()).select_from(PlanetaryData)).scalar_one())
+
+
+def list_signals(session: Session, limit: int = 50) -> list[dict]:
+    """Read the discoveries ledger (most-recent first) for the API / dashboard."""
+    rows = session.execute(
+        select(Signal).order_by(Signal.signal_id.desc()).limit(limit)
+    ).scalars().all()
+    return [
+        {
+            "signal_id": r.signal_id, "hypothesis_id": r.hypothesis_id, "name": r.name,
+            "family": r.family, "verdict": r.verdict,
+            "effect_size": float(r.effect_size) if r.effect_size is not None else None,
+            "p_raw": float(r.p_raw) if r.p_raw is not None else None,
+            "p_adj": float(r.p_adj) if r.p_adj is not None else None,
+            "n_comparisons": r.n_comparisons,
+            "dsr": float(r.dsr) if r.dsr is not None else None,
+        }
+        for r in rows
+    ]

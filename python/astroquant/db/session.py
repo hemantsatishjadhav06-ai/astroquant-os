@@ -10,6 +10,7 @@ which is dialect-agnostic, so "re-runs heal, never duplicate" holds on both back
 from __future__ import annotations
 
 import os
+import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 
@@ -18,8 +19,10 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from astroquant.db.models import Base
 
-# Local-first default. Override with AQ_DB_URL for Postgres/Timescale.
-DEFAULT_DB_URL = "sqlite:///astroquant.db"
+# Local-first default: a SQLite file in the system temp dir (always writable — unlike some
+# container/mounted working dirs). Override with AQ_DB_URL for a persistent Postgres/Timescale
+# (e.g. on Render) or a project-local path.
+DEFAULT_DB_URL = f"sqlite:///{os.path.join(tempfile.gettempdir(), 'astroquant.db')}"
 
 
 def resolve_db_url(url: str | None = None) -> str:
