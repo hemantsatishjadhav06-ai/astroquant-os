@@ -150,6 +150,11 @@ def get_source(name: str, **kw) -> MarketSource:
         return YFinanceSource()
     if name == "synthetic":
         return SyntheticSource(**{k: kw[k] for k in ("base_price", "annual_vol", "seed") if k in kw})
+    if name in ("nse", "bse"):
+        # Free real NSE/BSE data (Yahoo .NS/.BO redistribution) with synthetic fallback offline.
+        from astroquant.collectors.sources.india_sources import BSESource, NSESource
+        fallback = bool(kw.get("fallback_synthetic", True))
+        return NSESource(fallback) if name == "nse" else BSESource(fallback)
     if name == "kite":
         return KiteSource(kw.get("api_key", ""), kw.get("access_token", ""))
     raise ValueError(f"unknown market source: {name}")
