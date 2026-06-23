@@ -11,3 +11,4 @@ astroquant.db
 research_report.html
 *.html
 !docs/**/*.html
+*.db-journal

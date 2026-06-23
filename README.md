@@ -30,7 +30,35 @@ PYTHONPATH=python python3 -m astroquant.cli astro 2024-01-01
 PYTHONPATH=python python3 -m astroquant.cli gann 2024-01-01 --price 22000
 PYTHONPATH=python python3 -m astroquant.cli research --symbol NIFTY            # prints the verdict
 PYTHONPATH=python python3 -m astroquant.cli pipeline --out research_report.html # writes the report
+
+# 5) Autonomous Alpha Discovery Lab — Collect→Hypotheses→Backtest→Validate→Rank→Learn→Repeat
+PYTHONPATH=python python3 -m astroquant.cli lab --symbols NIFTY,BANKNIFTY --source synthetic
+PYTHONPATH=python python3 -m astroquant.cli lab --symbols NIFTY,RELIANCE --source nse   # LIVE NSE data
+
+# 6) Serve the live web dashboard + API (http://127.0.0.1:8000):
+pip install -e ".[api,data]" && astroquant serve
 ```
+
+## The Autonomous Alpha Discovery Lab (Idea 1)
+
+> "An AI research lab that continuously discovers, tests, validates, and ranks profitable market
+> signals from any data source — including astrology, Gann, technical, and market price action."
+
+```
+Collect → Generate Hypotheses → Backtest → Validate → Rank → Learn → Repeat
+```
+
+The lab (`python/astroquant/lab/`) enumerates hypotheses (each symbol × family-on-trial × decision
+band), runs every one through the full research protocol + paper-trade gate, and ranks the survivors.
+The decisive discipline: **every hypothesis increments a global comparison counter that deflates all
+p-values and Sharpes** (Benjamini–Hochberg + Deflated Sharpe), so searching a huge astro/Gann space
+can't manufacture a fake edge. Verified on **live NSE/BSE data** (free, via the `nse`/`bse` sources).
+A run that finds **0 survivors** on real NIFTY is the lab working correctly — an honest null.
+
+The **FastAPI service** (`python/astroquant/api/app.py`) exposes a live dashboard at `/` (run the lab,
+watch the leaderboard), plus `/lab/run`, `/discoveries`, `/astro/{date}`, `/healthz`.
+Deploy it on Render in minutes — see [`DEPLOY.md`](DEPLOY.md) and [`render.yaml`](render.yaml).
+**Secrets (broker/API keys) go in env vars only — never in code or git.**
 
 The research engine answers **RQ-004** — *do astro + Gann features add out-of-sample, post-cost
 predictive power beyond technical + market features for next-day NIFTY direction?* — and prints an
@@ -79,7 +107,16 @@ export AQ_DB_URL="sqlite:///astroquant.db"   # omit to use the same; set a postg
 | **Paper-Trading backend (G5 gate)** (post-cost ledger, reconciliation invariant, equity curve) | ✅ tested | `paper/engine.py` |
 | End-to-end pipeline + **HTML research report** | ✅ runnable | `research/pipeline.py`, `research/report.py`, `scripts/run_research.py` |
 
-**Test status:** 44/44 passing. Highlights:
+### Month-3 layer — the Autonomous Alpha Discovery Lab + service
+
+| Component | Status | File |
+|---|---|---|
+| **Free real NSE + BSE data** (live, via Yahoo `.NS`/`.BO`; synthetic fallback offline) | ✅ tested | `collectors/sources/india_sources.py` |
+| **Discovery Lab** (Collect→Hypotheses→Backtest→Validate→Rank→Learn→Repeat; global comparison denominator) | ✅ tested, runs on live data | `lab/` |
+| **FastAPI service + live dashboard** (`/`, `/lab/run`, `/discoveries`, `/astro`, `/healthz`) | ✅ tested | `api/app.py` |
+| **Render-deployable** (`render.yaml`, `Dockerfile`, secrets via env only) | ✅ | `render.yaml`, `Dockerfile`, `DEPLOY.md` |
+
+**Test status:** 55/55 passing. Highlights:
 - astronomy positions verified vs published Vedic ephemeris for 2024-01-01 (Jupiter in Aries, Saturn
   in Aquarius, Rahu in Pisces, Mercury retrograde);
 - Gann Square-of-Nine verified against closed-form values (base 144 → 360° = 196, 180° = 169);
