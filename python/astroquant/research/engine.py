@@ -105,6 +105,8 @@ def run_protocol(
     fm: FeatureMatrix,
     hypothesis_id: str = "RQ-004",
     *,
+    baseline_families: tuple[str, ...] = BASELINE_FAMILIES,
+    augmented_families: tuple[str, ...] = AUGMENTED_FAMILIES,
     k_folds: int = 5,
     embargo: int = 2,
     n_permutations: int = 30,
@@ -116,10 +118,12 @@ def run_protocol(
 
     ``n_prior_trials`` is the running denominator of comparisons made on this question family — it
     deflates both the p-value (Bonferroni-style) and the Sharpe (DSR). Pass the true count.
+    ``baseline_families``/``augmented_families`` let the discovery lab put a *specific* family on
+    trial (e.g. baseline {technical,market} vs augmented +{astro}) instead of the default all-vs-base.
     """
     mk = {"l2": 1.0, "lr": 0.2, "n_iter": 400, "seed": seed}
-    X_aug = fm.subset(AUGMENTED_FAMILIES)
-    X_base = fm.subset(BASELINE_FAMILIES)
+    X_aug = fm.subset(augmented_families)
+    X_base = fm.subset(baseline_families)
 
     baseline_auc = _overall_oos_auc(X_base, fm.y, k_folds, embargo, mk)
     augmented_auc = _overall_oos_auc(X_aug, fm.y, k_folds, embargo, mk)
@@ -177,8 +181,8 @@ def run_protocol(
         strategy_sharpe=round(strat_sharpe, 4), strategy_dsr=round(strat_dsr, 4),
         verdict=verdict,
         detail={
-            "baseline_families": list(BASELINE_FAMILIES),
-            "augmented_families": list(AUGMENTED_FAMILIES),
+            "baseline_families": list(baseline_families),
+            "augmented_families": list(augmented_families),
             "shuffle_detail": shuffle_res.detail,
             "random_feature_detail": rf_res.detail,
             "cost_bps": cost_bps, "k_folds": k_folds, "embargo": embargo,
