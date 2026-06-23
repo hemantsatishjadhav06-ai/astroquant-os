@@ -90,6 +90,40 @@ def pipeline(
 
 
 @app.command()
+def lab(
+    symbols: str = "NIFTY,BANKNIFTY", source: str = "synthetic",
+    start: str = "2018-01-01", end: str = "2023-12-31",
+    rounds: int = 1, permutations: int = 10,
+) -> None:
+    """Autonomous Alpha Discovery Lab: Collect→Hypotheses→Backtest→Validate→Rank→Learn→Repeat."""
+    from astroquant.lab import DiscoveryLab
+
+    syms = [s.strip().upper() for s in symbols.split(",") if s.strip()]
+    dl = DiscoveryLab(syms, source=source, start=date.fromisoformat(start),
+                      end=date.fromisoformat(end), n_permutations=permutations)
+    rep = dl.run(rounds=rounds, learn=(rounds > 1))
+    typer.echo(f"\n  Tested {rep.total_tested} hypotheses · {rep.n_survivors} survived "
+               f"(source={source}, symbols={','.join(syms)})")
+    typer.echo(f"  {'#':>2} {'hyp':>7} {'symbol':<10} {'family':<11} {'verdict':<15} "
+               f"{'lift':>7} {'q':>6} {'DSR':>6}")
+    for d in rep.leaderboard:
+        typer.echo(f"  {d.rank:>2} {d.hypothesis_id:>7} {d.symbol:<10} "
+                   f"{'+'.join(d.trial_families):<11} {d.verdict:<15} "
+                   f"{d.incremental_lift:>+7.3f} {d.q_value:>6.3f} {d.dsr:>6.2f}")
+    if rep.n_survivors == 0:
+        typer.secho("  No validated edges — the lab refused to certify noise (correct null).",
+                    fg=typer.colors.BLUE)
+
+
+@app.command()
+def serve(host: str = "127.0.0.1", port: int = 8000) -> None:
+    """Run the FastAPI dashboard/API locally (uvicorn)."""
+    import uvicorn
+
+    uvicorn.run("astroquant.api.app:app", host=host, port=port)
+
+
+@app.command()
 def health() -> None:
     """Healthcheck all wired agents."""
     agents = (
