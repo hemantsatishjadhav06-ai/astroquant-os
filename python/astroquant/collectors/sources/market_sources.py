@@ -10,8 +10,9 @@ Every Bar is provider-stamped (`source`) so the warehouse can cross-check two so
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Protocol
 
 
@@ -70,6 +71,57 @@ class YFinanceSource:
         return bars
 
 
+class SyntheticSource:
+    """
+    Deterministic, offline OHLCV generator (docs/005 — research/test source).
+
+    Produces reproducible business-day bars via a seeded geometric random walk with a slow
+    regime drift, so the *entire* research pipeline (features → research engine → paper trade)
+    runs with **no network and no broker keys** and gives identical results across machines.
+    NOT a source for findings — it is the leakage/over-fitting harness's clean room.
+    """
+    name = "synthetic"
+
+    def __init__(self, base_price: float = 20000.0, annual_vol: float = 0.18, seed: int = 7) -> None:
+        self.base_price = base_price
+        self.annual_vol = annual_vol
+        self.seed = seed
+
+    def history(self, symbol: str, interval: str, start: date, end: date) -> list[Bar]:
+        import numpy as np  # core dependency; lazy to mirror the other sources
+
+        # Seed deterministically from (symbol, start) so every (symbol, window) is reproducible.
+        seed = (hash((symbol, self.seed, start.toordinal())) & 0xFFFFFFFF)
+        rng = np.random.default_rng(seed)
+
+        days = [
+            start + timedelta(days=i)
+            for i in range((end - start).days + 1)
+            if (start + timedelta(days=i)).weekday() < 5  # business days only
+        ]
+        if not days:
+            return []
+
+        daily_vol = self.annual_vol / math.sqrt(252.0)
+        bars: list[Bar] = []
+        price = self.base_price
+        for i, d in enumerate(days):
+            regime_drift = 0.0004 * math.sin(i / 40.0)  # slow bull/bear stretches
+            ret = float(rng.normal(regime_drift, daily_vol))
+            prev = price
+            price = max(1.0, prev * math.exp(ret))
+            open_, close = prev, price
+            hi = max(open_, close) * (1 + abs(float(rng.normal(0, daily_vol / 3))))
+            lo = min(open_, close) * (1 - abs(float(rng.normal(0, daily_vol / 3))))
+            vol = int(abs(float(rng.normal(1_000_000, 250_000))))
+            bars.append(Bar(
+                symbol=symbol, ts=datetime(d.year, d.month, d.day),
+                interval=interval, open=round(open_, 2), high=round(hi, 2),
+                low=round(lo, 2), close=round(close, 2), volume=vol, oi=None, source=self.name,
+            ))
+        return bars
+
+
 class KiteSource:
     """
     Zerodha Kite Connect adapter (stub).
@@ -96,6 +148,8 @@ class KiteSource:
 def get_source(name: str, **kw) -> MarketSource:
     if name == "yfinance":
         return YFinanceSource()
+    if name == "synthetic":
+        return SyntheticSource(**{k: kw[k] for k in ("base_price", "annual_vol", "seed") if k in kw})
     if name == "kite":
         return KiteSource(kw.get("api_key", ""), kw.get("access_token", ""))
     raise ValueError(f"unknown market source: {name}")
