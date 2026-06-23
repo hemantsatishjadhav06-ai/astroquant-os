@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import date
 
 import typer
 
 from astroquant.agents.base import RunContext
 from astroquant.collectors.astronomy import AstronomyCollector
+from astroquant.collectors.gann import GannCollector
 from astroquant.collectors.market import MarketCollector
 from astroquant.common.config import get_settings
 
@@ -30,7 +31,7 @@ def astro(start: str, end: str = "") -> None:
 
 @app.command()
 def market(symbols: str = "NIFTY", start: str = "", end: str = "") -> None:
-    """Run the Market collector (default source from config; yfinance fallback)."""
+    """Run the Market collector (default source from config; yfinance/synthetic fallback)."""
     cfg = get_settings()
     s = date.fromisoformat(start) if start else date.today()
     e = date.fromisoformat(end) if end else s
@@ -40,9 +41,63 @@ def market(symbols: str = "NIFTY", start: str = "", end: str = "") -> None:
 
 
 @app.command()
+def gann(anchor: str, price: float = 100.0, days_out: int = 90) -> None:
+    """Run the Gann collector from an anchor pivot date+price (Square-of-Nine + time cycles)."""
+    col = GannCollector(points_per_day=1.0)
+    ctx = RunContext(run_id=_rid(), start=date.fromisoformat(anchor),
+                     config={"anchor_price": price, "days_out": days_out})
+    res = col.run(ctx)
+    typer.echo(f"{res.status}: {res.metrics['levels']} Sq9 levels + "
+               f"{res.metrics['cycles']} time-cycles. manifest={res.manifest_path}")
+
+
+@app.command()
+def research(
+    symbol: str = "NIFTY", start: str = "2014-01-01", end: str = "2023-12-31",
+    source: str = "synthetic", trials: int = 1,
+) -> None:
+    """Run the baseline→augmented→ablation→verdict protocol for a hypothesis (default RQ-004)."""
+    from astroquant.research.pipeline import run_full_pipeline
+
+    out = run_full_pipeline(symbol, date.fromisoformat(start), date.fromisoformat(end),
+                            source=source, n_prior_trials=trials)
+    r = out.report
+    typer.echo(f"\n  Hypothesis RQ-004 — does astro+gann beat technical+market for next-day {symbol}?")
+    typer.echo(f"  baseline AUC = {r.baseline_auc:.3f}   augmented AUC = {r.augmented_auc:.3f}   "
+               f"lift = {r.incremental_lift:+.3f}")
+    typer.echo(f"  shuffle-label: {'real signal' if r.shuffle_label_pass else 'no edge (null)'}   "
+               f"random-feature: {'pass' if r.random_feature_pass else 'FAIL'}   "
+               f"p_adj = {r.p_adj:.4f}")
+    typer.echo(f"  paper-trade post-cost: return {out.paper.total_return*100:+.2f}%  "
+               f"Sharpe {out.paper.sharpe:.2f}  DSR {out.paper.deflated_sharpe:.2f}  "
+               f"maxDD {out.paper.max_drawdown*100:.1f}%")
+    typer.secho(f"  VERDICT: {r.verdict}\n", fg=typer.colors.GREEN if r.verdict == "edge"
+                else (typer.colors.YELLOW if r.verdict == "conditional_edge" else typer.colors.BLUE))
+
+
+@app.command()
+def pipeline(
+    symbol: str = "NIFTY", start: str = "2014-01-01", end: str = "2023-12-31",
+    source: str = "synthetic", out: str = "research_report.html",
+) -> None:
+    """Full vertical slice → writes a self-contained HTML research report you can open."""
+    from astroquant.research.pipeline import run_full_pipeline
+    from astroquant.research.report import write_html_report
+
+    output = run_full_pipeline(symbol, date.fromisoformat(start), date.fromisoformat(end), source=source)
+    write_html_report(output, out)
+    typer.echo(f"verdict={output.report.verdict}  →  wrote {out}")
+
+
+@app.command()
 def health() -> None:
     """Healthcheck all wired agents."""
-    for agent in (AstronomyCollector(), MarketCollector(source=get_settings().broker)):
+    agents = (
+        AstronomyCollector(),
+        MarketCollector(source=get_settings().broker),
+        GannCollector(),
+    )
+    for agent in agents:
         h = agent.healthcheck()
         typer.echo(f"{agent.name:<22} ok={h.ok}  {h.detail}")
 
