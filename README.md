@@ -46,6 +46,9 @@ PYTHONPATH=python python3 -m astroquant.cli fund --symbol NIFTY --source nse --g
 
 # 9) Stock Deep Dive — astro + technical + Gann + backtest + analyst narrative, per stock
 PYTHONPATH=python python3 -m astroquant.cli stock --symbol RELIANCE --source nse --out RELIANCE.md
+
+# 10) Options Greeks Engine — vol regime → structure → risk-sized order intents (+ backtest)
+PYTHONPATH=python python3 -m astroquant.cli options --symbol NIFTY --source nse --backtest
 ```
 
 ## The Autonomous Alpha Discovery Lab (Idea 1)
@@ -100,6 +103,26 @@ An **LLM analyst narrative** is generated when `ANTHROPIC_API_KEY` or `OPENAI_AP
 environment (model via `AQ_LLM_MODEL`); otherwise a strong built-in narrative is used — **no keys in code**.
 Runs over a curated NSE universe (NIFTY-50 + indices) that's extensible to the full exchange.
 UI: the **📈 Stock Deep Dive** tab. API: `GET /universe`, `POST /stock/analyze`. CLI: `astroquant stock --symbol RELIANCE --out note.md`.
+
+## Options Greeks Engine (Δ / Θ / Γ)
+
+`python/astroquant/strategies/options_greeks/` is the volatility-and-Greeks decision layer that turns
+the platform's directional/timing signals into **structured, risk-bounded options positions** on
+Indian index & stock options. It encodes the one rule that governs options P&L — **you cannot be long
+Gamma and long Theta at the same time** — so every trade is an explicit bet on realized vs. implied
+volatility, with Delta carrying the directional view.
+
+Pipeline: `signal (dir + conviction) + option chain (IV, IV-rank) → vol regime → structure → worst-case-gap risk sizing → order intents + Greek-based exits + a live trigger`. It ships:
+Black–Scholes pricing + Greeks + an IV solver (`greeks.py`); a live-NSE/synthetic **option chain**
+collector with IV-rank (`chain.py`); the **NSE/BSE expiry calendar** with the Gamma-cliff rule
+(`expiry.py`); a Greek-profiled **structure library** — straddle, strangle, debit spread, calendar,
+iron condor, broken-wing (`structures.py`); the deterministic **`(regime, conviction, dir) → structure`**
+mapping with Greek-aware **gates** (never sell vol when IV-rank < 0.50; never hold net-short-Gamma into
+the expiry final hour) (`decision.py`); **worst-case-gap risk sizing** (`risk.py`); and a **backtest**
+with the India options cost stack and the metrics that matter — net-of-cost P&L, max drawdown, win
+rate, **tail loss (worst 1%)**, and realized-vs-implied capture (`backtest.py`).
+**Research/paper only — order intents are never sent to a broker.**
+UI: the **⚡ Options Greeks** tab. API: `POST /options/signal`, `POST /options/backtest`, `GET /options/chain`. CLI: `astroquant options --symbol NIFTY --backtest`.
 
 The research engine answers **RQ-004** — *do astro + Gann features add out-of-sample, post-cost
 predictive power beyond technical + market features for next-day NIFTY direction?* — and prints an
@@ -159,9 +182,10 @@ export AQ_DB_URL="sqlite:///astroquant.db"   # omit to use the same; set a postg
 | **Market Genome Project (Idea 2)** — relationship studies → knowledge graph + research note | ✅ tested | `genome/` |
 | **Self-Evolving Hedge Fund (Idea 3)** — evolutionary search → validate → gated paper portfolio | ✅ tested | `fund/` |
 | **Stock Deep Dive** — per-stock astro+technical+Gann+backtest + LLM narrative over a curated NSE universe | ✅ tested | `analysis/`, `universe/` |
-| **Unified 4-tab dashboard** (Lab · Genome · Fund · Stock) with inline-SVG charts | ✅ tested | `api/dashboard.py` |
+| **Options Greeks Engine (Δ/Θ/Γ)** — vol regime → structure → risk-sized intents + options backtest | ✅ tested | `strategies/options_greeks/` |
+| **Unified 5-tab dashboard** (Lab · Genome · Fund · Stock · Options) with inline-SVG charts | ✅ tested | `api/dashboard.py` |
 
-**Test status:** 75/75 passing. Highlights:
+**Test status:** 86/86 passing. Highlights:
 - astronomy positions verified vs published Vedic ephemeris for 2024-01-01 (Jupiter in Aries, Saturn
   in Aquarius, Rahu in Pisces, Mercury retrograde);
 - Gann Square-of-Nine verified against closed-form values (base 144 → 360° = 196, 180° = 169);
