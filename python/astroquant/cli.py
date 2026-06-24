@@ -116,6 +116,46 @@ def lab(
 
 
 @app.command()
+def genome(
+    symbol: str = "NIFTY", source: str = "synthetic",
+    start: str = "2017-01-01", end: str = "2023-12-31", out: str = "",
+) -> None:
+    """Market Genome Project (Idea 2): test relationships → knowledge graph + research note."""
+    from astroquant.genome import KnowledgeGraph, run_genome
+
+    rep = run_genome(symbol, source=source, start=date.fromisoformat(start), end=date.fromisoformat(end))
+    typer.echo(f"\n  Market Genome — {symbol}: {rep.n_relationships}/{rep.n_studies} "
+               f"relationships survived FDR correction")
+    for f in rep.findings:
+        typer.echo(f"  {f.id} {f.predictor:<16}→{f.outcome:<11} r={f.effect:>+6.3f} "
+                   f"q={f.q_value:>5.3f}  {f.verdict}")
+    if out:
+        with open(out, "w", encoding="utf-8") as fh:
+            fh.write(KnowledgeGraph.from_report(rep).to_markdown(rep))
+        typer.echo(f"  research note → {out}")
+
+
+@app.command()
+def fund(
+    symbol: str = "NIFTY", source: str = "synthetic",
+    start: str = "2016-01-01", end: str = "2023-12-31", generations: int = 4, pop: int = 8,
+) -> None:
+    """Self-Evolving Hedge Fund (Idea 3): evolve strategies → validate → paper portfolio + risk."""
+    from astroquant.fund import run_fund
+
+    res = run_fund(symbol, source=source, start=date.fromisoformat(start),
+                   end=date.fromisoformat(end), generations=generations, pop_size=pop)
+    e, r = res.evolution, res.risk
+    typer.echo(f"\n  Evolved {e.n_evaluated} strategies → best [{e.best_label}] "
+               f"(band={e.best_prob_band}, l2={e.best_l2})")
+    typer.echo(f"  paper portfolio: return {r.total_return*100:+.1f}%  Sharpe {r.sharpe}  "
+               f"DSR {r.deflated_sharpe}  maxDD {r.max_drawdown*100:.1f}%  VaR95 {r.var_95*100:.2f}%")
+    typer.secho(f"  rigorous re-validation verdict: {r.research_verdict} (lift {r.incremental_lift:+.3f})  "
+                f"·  {r.deploy_gate}",
+                fg=typer.colors.GREEN if r.research_verdict == "edge" else typer.colors.BLUE)
+
+
+@app.command()
 def serve(host: str = "127.0.0.1", port: int = 8000) -> None:
     """Run the FastAPI dashboard/API locally (uvicorn)."""
     import uvicorn

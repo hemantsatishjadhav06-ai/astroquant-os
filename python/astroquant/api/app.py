@@ -78,6 +78,39 @@ def discoveries(limit: int = Query(50, ge=1, le=500)) -> dict:
         return {"discoveries": [], "error": str(e)}
 
 
+@app.post("/genome/run")
+def genome_run(
+    symbol: str = Query("NIFTY"),
+    source: str = Query("nse", pattern="^(nse|bse|synthetic|yfinance)$"),
+    start: str = Query("2017-01-01"),
+    end: str = Query("2024-12-31"),
+) -> JSONResponse:
+    """Market Genome (Idea 2): test condition→outcome relationships, return graded findings + graph."""
+    from astroquant.genome import KnowledgeGraph, run_genome
+
+    rep = run_genome(symbol, source=source, start=date.fromisoformat(start), end=date.fromisoformat(end))
+    out = rep.to_dict()
+    out["mermaid"] = KnowledgeGraph.from_report(rep).to_mermaid()
+    return JSONResponse(out)
+
+
+@app.post("/fund/evolve")
+def fund_evolve(
+    symbol: str = Query("NIFTY"),
+    source: str = Query("nse", pattern="^(nse|bse|synthetic|yfinance)$"),
+    start: str = Query("2016-01-01"),
+    end: str = Query("2024-12-31"),
+    generations: int = Query(4, ge=1, le=10),
+    pop: int = Query(8, ge=4, le=24),
+) -> JSONResponse:
+    """Self-Evolving Hedge Fund (Idea 3): evolve → validate → paper portfolio + risk report."""
+    from astroquant.fund import run_fund
+
+    res = run_fund(symbol, source=source, start=date.fromisoformat(start), end=date.fromisoformat(end),
+                   generations=generations, pop_size=pop)
+    return JSONResponse(res.to_dict())
+
+
 @app.get("/", response_class=HTMLResponse)
 def home() -> str:
     return DASHBOARD_HTML
