@@ -43,6 +43,9 @@ PYTHONPATH=python python3 -m astroquant.cli genome --symbol NIFTY --source nse -
 
 # 8) Self-Evolving Hedge Fund (Idea 3) — evolve strategies → validate → paper portfolio
 PYTHONPATH=python python3 -m astroquant.cli fund --symbol NIFTY --source nse --generations 5
+
+# 9) Stock Deep Dive — astro + technical + Gann + backtest + analyst narrative, per stock
+PYTHONPATH=python python3 -m astroquant.cli stock --symbol RELIANCE --source nse --out RELIANCE.md
 ```
 
 ## The Autonomous Alpha Discovery Lab (Idea 1)
@@ -84,6 +87,19 @@ is produced. **Deploy = paper only (G5 gate); no live orders, ever.** This is th
 lesson in code: a strategy can look spectacular in the evolution slice (e.g. +65%, Sharpe 1.1) and
 still be graded **no-edge** once walk-forward + multiple-testing correction is applied.
 API: `POST /fund/evolve`. CLI: `astroquant fund --generations 5`.
+
+## Stock Deep Dive — all three lenses on one name
+
+`python/astroquant/analysis/` + `python/astroquant/universe/` fuse everything into a per-stock report:
+a **technical** read (trend, RSI, SMAs, momentum, volatility), **Gann** geometry (Square-of-Nine
+support/resistance around the live price, swing pivots, upcoming time-cycle dates), the **astrological**
+backdrop (current sidereal transits, retrogrades, Moon nakshatra, tight aspects — flagged as an unproven
+prior), and a **backtest verdict** that honestly states whether astro+Gann add real edge for that name.
+A synthesized **stance** (Constructive / Neutral / Cautious) leans on the evidence-based technical core.
+An **LLM analyst narrative** is generated when `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` is set in the
+environment (model via `AQ_LLM_MODEL`); otherwise a strong built-in narrative is used — **no keys in code**.
+Runs over a curated NSE universe (NIFTY-50 + indices) that's extensible to the full exchange.
+UI: the **📈 Stock Deep Dive** tab. API: `GET /universe`, `POST /stock/analyze`. CLI: `astroquant stock --symbol RELIANCE --out note.md`.
 
 The research engine answers **RQ-004** — *do astro + Gann features add out-of-sample, post-cost
 predictive power beyond technical + market features for next-day NIFTY direction?* — and prints an
@@ -142,8 +158,10 @@ export AQ_DB_URL="sqlite:///astroquant.db"   # omit to use the same; set a postg
 | **Render-deployable** (`render.yaml`, `Dockerfile`, secrets via env only) | ✅ | `render.yaml`, `Dockerfile`, `DEPLOY.md` |
 | **Market Genome Project (Idea 2)** — relationship studies → knowledge graph + research note | ✅ tested | `genome/` |
 | **Self-Evolving Hedge Fund (Idea 3)** — evolutionary search → validate → gated paper portfolio | ✅ tested | `fund/` |
+| **Stock Deep Dive** — per-stock astro+technical+Gann+backtest + LLM narrative over a curated NSE universe | ✅ tested | `analysis/`, `universe/` |
+| **Unified 4-tab dashboard** (Lab · Genome · Fund · Stock) with inline-SVG charts | ✅ tested | `api/dashboard.py` |
 
-**Test status:** 64/64 passing. Highlights:
+**Test status:** 75/75 passing. Highlights:
 - astronomy positions verified vs published Vedic ephemeris for 2024-01-01 (Jupiter in Aries, Saturn
   in Aquarius, Rahu in Pisces, Mercury retrograde);
 - Gann Square-of-Nine verified against closed-form values (base 144 → 360° = 196, 180° = 169);
