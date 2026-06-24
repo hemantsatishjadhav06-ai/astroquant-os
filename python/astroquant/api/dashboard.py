@@ -77,6 +77,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/
    <button class="tab active" data-t="lab" onclick="tab('lab')">🔭 Discovery Lab</button>
    <button class="tab" data-t="genome" onclick="tab('genome')">🧬 Market Genome</button>
    <button class="tab" data-t="fund" onclick="tab('fund')">🤖 Evolving Fund</button>
+   <button class="tab" data-t="stock" onclick="tab('stock')">📈 Stock Deep Dive</button>
  </div>
 
  <!-- ===================== LAB ===================== -->
@@ -185,6 +186,47 @@ DASHBOARD_HTML = r"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/
    </div>
  </section>
 
+ <!-- ===================== STOCK DEEP DIVE ===================== -->
+ <section class="panel" id="p-stock">
+   <div class="card">
+     <div class="controls">
+       <div><label>Symbol</label><input id="s-symbol" list="s-list" value="RELIANCE" size="14"/>
+         <datalist id="s-list"></datalist></div>
+       <div><label>Source</label><select id="s-source">
+         <option value="nse">NSE · live</option><option value="bse">BSE · live</option>
+         <option value="synthetic">Synthetic</option></select></div>
+       <div><label>History (years)</label><input id="s-years" type="number" value="6" min="2" max="12" style="width:74px"/></div>
+       <button class="btn" id="s-btn" onclick="runStock()">Deep dive ▶</button>
+     </div>
+     <div class="flow">Technical + Gann + Astrology + Backtest, fused into one analyst view (LLM-narrated when a key is set).</div>
+     <div class="spin" id="s-spin"><div class="dot"></div><span>Collecting data, computing transits, levels & backtest…</span></div>
+   </div>
+   <div id="s-out" style="display:none">
+     <div class="card">
+       <div class="stratcard">
+         <div id="s-stance-emoji" style="font-size:30px">📊</div>
+         <div style="flex:1"><div id="s-title" style="font-size:18px;font-weight:700"></div>
+           <div class="muted" id="s-sub" style="font-size:12px"></div></div>
+         <div id="s-stance"></div>
+       </div>
+       <div class="kpis">
+         <div class="kpi"><b id="s-price">–</b><span>last close</span></div>
+         <div class="kpi"><b id="s-chg">–</b><span>20-day change</span></div>
+         <div class="kpi"><b id="s-trend">–</b><span>trend · RSI</span></div>
+         <div class="kpi"><b id="s-verdict">–</b><span>astro+gann backtest</span></div>
+       </div>
+     </div>
+     <div class="grid2">
+       <div class="card"><h3>Technical</h3><div id="s-tech"></div></div>
+       <div class="card"><h3>Gann geometry</h3><div id="s-gann"></div></div>
+       <div class="card"><h3>Astrological backdrop</h3><div id="s-astro"></div></div>
+       <div class="card"><h3>Backtest equity (paper, post-cost)</h3><div id="s-eq"></div></div>
+     </div>
+     <div class="card"><h3>Analyst narrative <span class="muted" id="s-nsrc" style="font-size:10px"></span></h3>
+       <div id="s-narr" style="font-size:13.5px;line-height:1.6"></div></div>
+   </div>
+ </section>
+
  <footer>AstroQuant OS · research platform only · Swiss Ephemeris isolated behind the astronomy collector · nothing is assumed true, everything is tested.</footer>
 </div>
 <script>
@@ -266,5 +308,37 @@ async function runFund(){busy(true,'f-btn','f-spin');try{
     ?'<b>The evolved winner looked good on its own slice but was graded NO-EDGE by the rigorous engine.</b> That is the anti-overfitting gate: a backtest Sharpe selected from many trials is deflated and walk-forward tested before it can be believed. Deploy stays paper-only.'
     :'<b>This strategy cleared the rigorous gate.</b> Still paper-only (G5) — forward-validate for months before any live discussion.';
 }catch(e){alert('Fund run failed: '+e)}finally{busy(false,'f-btn','f-spin')}}
+
+function kv(rows){return '<table>'+rows.map(function(r){return '<tr><td class="muted" style="width:44%">'+r[0]+'</td><td>'+r[1]+'</td></tr>'}).join('')+'</table>';}
+function md(t){return (t||'').split('\n').map(function(l){
+  if(/^#\s/.test(l))return '<h2 style="font-size:17px;margin:14px 0 6px;color:#fff">'+l.replace(/^#\s/,'')+'</h2>';
+  if(/^##\s/.test(l))return '<h3 style="margin:14px 0 6px">'+l.replace(/^##\s/,'')+'</h3>';
+  if(/^>\s/.test(l))return '<blockquote style="border-left:3px solid #34406e;margin:8px 0;padding:6px 12px;color:#aab6da">'+l.replace(/^>\s/,'')+'</blockquote>';
+  if(/^\s*$/.test(l))return '';return '<p style="margin:6px 0">'+l+'</p>';}).join('').replace(/\*\*(.+?)\*\*/g,'<b>$1</b>');}
+
+async function runStock(){busy(true,'s-btn','s-spin');try{
+  var q=new URLSearchParams({symbol:$('s-symbol').value,source:$('s-source').value,years:$('s-years').value});
+  var d=await call('/stock/analyze?'+q);$('s-out').style.display='block';
+  var m=d.market,t=d.technical,g=d.gann,a=d.astro,b=d.backtest,s=d.scores;
+  $('s-title').textContent=d.name+' ('+d.symbol+')';
+  $('s-sub').textContent=d.sector+' · as of '+d.as_of+' · '+d.n_bars+' sessions · '+((d.meta&&d.meta.data_source_stamp)||d.source);
+  $('s-stance').innerHTML='<span class="badge '+(s.stance==='Constructive'?'b-edge':(s.stance==='Cautious'?'b-cond':'b-no'))+'">'+s.stance.toUpperCase()+' '+(s.composite>=0?'+':'')+s.composite+'</span>';
+  $('s-stance-emoji').textContent=s.stance==='Constructive'?'🟢':(s.stance==='Cautious'?'🔴':'🟡');
+  $('s-price').textContent='₹'+m.last_close.toLocaleString('en-IN');
+  $('s-chg').innerHTML=pct(m.change_20d);
+  $('s-trend').textContent=t.trend+' · RSI '+t.rsi14;
+  $('s-verdict').innerHTML=vbadge(b.verdict||'not_validated');
+  $('s-tech').innerHTML=kv([['Trend',t.trend],['RSI(14)',t.rsi14+' ('+t.rsi_state+')'],['Price vs 20D SMA',pct(t.price_vs_sma20)+' · ₹'+t.sma20],['Price vs 50D SMA',pct(t.price_vs_sma50)+' · ₹'+t.sma50],['20D momentum',pct(t.momentum_20d)],['Ann. volatility',(t.volatility_annual*100).toFixed(0)+'%'],['Volume vs 20D avg',t.volume_vs_avg20+'×']]);
+  var cyc=(g.upcoming_cycles||[]).slice(0,4).map(function(c){return c.date+' ('+c.days+'d/'+c.from+')'}).join(', ')||'—';
+  $('s-gann').innerHTML=kv([['Nearest resistance','₹'+g.nearest_resistance],['Nearest support','₹'+g.nearest_support],['Resistances','₹'+(g.resistances||[]).join(', ₹')],['Supports','₹'+(g.supports||[]).join(', ₹')],['Swing high','₹'+g.pivot_high+' · '+g.pivot_high_date],['Swing low','₹'+g.pivot_low+' · '+g.pivot_low_date],['Time-cycle windows',cyc]]);
+  $('s-astro').innerHTML=kv([['Moon',a.moon_sign+' / '+a.moon_nakshatra+' ('+a.paksha+', '+(a.moon_illum*100).toFixed(0)+'%)'],['Sun',a.sun_sign],['Retrograde',(a.retrogrades||[]).join(', ')||'none'],['Tight aspects',(a.aspects||[]).slice(0,4).map(function(x){return x.a+'–'+x.b+' '+x.type}).join('; ')||'none']]);
+  $('s-eq').innerHTML=(b.equity_curve&&b.equity_curve.length>1)?lineSVG(b.equity_curve,{base:b.equity_curve[0]}):'<div class="muted">backtest equity unavailable</div>';
+  $('s-nsrc').textContent='· '+(d.narrative_source||'built-in');
+  $('s-narr').innerHTML=md(d.narrative);
+}catch(e){alert('Stock analysis failed: '+e)}finally{busy(false,'s-btn','s-spin')}}
+
+async function loadUniverse(){try{var r=await fetch('/universe');var d=await r.json();
+  $('s-list').innerHTML=d.stocks.map(function(x){return '<option value="'+x.symbol+'">'+x.name+' · '+x.sector+'</option>'}).join('');}catch(e){}}
+window.addEventListener('load',loadUniverse);
 </script>
 </body></html>"""

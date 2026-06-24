@@ -31,12 +31,17 @@ def main() -> None:
                                         "start": "2018-01-01", "end": "2024-12-31"}).json()
     fund = c.post("/fund/evolve", params={"symbol": "NIFTY", "source": src, "start": "2018-01-01",
                                           "end": "2024-12-31", "generations": 5, "pop": 8}).json()
-    data = json.dumps({"lab": lab, "genome": gen, "fund": fund})
+    stock = c.post("/stock/analyze", params={"symbol": "RELIANCE", "source": src, "years": 6}).json()
+    universe = c.get("/universe").json()
+    data = json.dumps({"lab": lab, "genome": gen, "fund": fund, "stock": stock, "universe": universe})
     inject = (
         "<script>window.__D=" + data + ";"
         "call=async function(u){if(u.indexOf('/lab')>=0)return window.__D.lab;"
-        "if(u.indexOf('/genome')>=0)return window.__D.genome;return window.__D.fund;};"
-        "window.addEventListener('load',function(){try{runLab();runGenome();runFund();}catch(e){}});"
+        "if(u.indexOf('/genome')>=0)return window.__D.genome;"
+        "if(u.indexOf('/stock')>=0)return window.__D.stock;return window.__D.fund;};"
+        "var _f=window.fetch;window.fetch=function(u,o){if((''+u).indexOf('/universe')>=0)"
+        "return Promise.resolve({json:function(){return Promise.resolve(window.__D.universe)}});return _f(u,o);};"
+        "window.addEventListener('load',function(){try{runLab();runGenome();runFund();runStock();}catch(e){}});"
         "</script>"
     )
     html = DASHBOARD_HTML.replace("</body>", inject + "\n</body>")

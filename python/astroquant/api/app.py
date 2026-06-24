@@ -114,6 +114,36 @@ def fund_evolve(
     return JSONResponse(res.to_dict())
 
 
+@app.get("/universe")
+def universe() -> dict:
+    """The stock universe (curated NSE catalog) + sector map."""
+    from astroquant.universe import list_sectors, load_universe
+
+    return {
+        "stocks": [{"symbol": m.symbol, "name": m.name, "sector": m.sector,
+                    "exchange": m.exchange, "yahoo": m.yahoo} for m in load_universe()],
+        "sectors": list_sectors(),
+    }
+
+
+@app.post("/stock/analyze")
+def stock_analyze(
+    symbol: str = Query("RELIANCE"),
+    source: str = Query("nse", pattern="^(nse|bse|synthetic|yfinance)$"),
+    years: int = Query(6, ge=2, le=12),
+    narrative: bool = Query(True),
+) -> JSONResponse:
+    """Deep dive: technical + Gann + astrology + backtest + analyst narrative for one symbol."""
+    from astroquant.analysis import analyze_stock, generate_narrative, llm_available
+
+    rep = analyze_stock(symbol, source=source, years=years, n_permutations=10)
+    out = rep.to_dict()
+    if narrative:
+        out["narrative"] = generate_narrative(rep)
+        out["narrative_source"] = llm_available() or "built-in"
+    return JSONResponse(out)
+
+
 @app.get("/", response_class=HTMLResponse)
 def home() -> str:
     return DASHBOARD_HTML

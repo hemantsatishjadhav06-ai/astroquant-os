@@ -156,6 +156,27 @@ def fund(
 
 
 @app.command()
+def stock(symbol: str = "RELIANCE", source: str = "nse", years: int = 6, out: str = "") -> None:
+    """Deep dive on one symbol: technical + Gann + astrology + backtest + analyst narrative."""
+    from astroquant.analysis import analyze_stock, generate_narrative
+
+    r = analyze_stock(symbol, source=source, years=years)
+    typer.echo(f"\n  {r.name} ({r.symbol}) · {r.sector} · as of {r.as_of} · {r.n_bars} sessions")
+    typer.echo(f"  ₹{r.market['last_close']:,}  ({r.technical['trend']}, RSI {r.technical['rsi14']})  "
+               f"· 1y high ₹{r.market['high_252']:,} ({r.market['dist_from_high']*100:+.0f}%)")
+    typer.echo(f"  Gann R/S: ₹{r.gann['nearest_resistance']:,} / ₹{r.gann['nearest_support']:,}  "
+               f"· Moon {r.astro['moon_sign']}/{r.astro['moon_nakshatra']}  · retro: {','.join(r.astro['retrogrades']) or 'none'}")
+    typer.echo(f"  backtest: {r.backtest['verdict']} (lift {r.backtest['incremental_lift']:+.3f})")
+    typer.secho(f"  STANCE: {r.scores['stance']} ({r.scores['composite']:+.2f})",
+                fg=typer.colors.GREEN if r.scores['stance'] == 'Constructive'
+                else (typer.colors.RED if r.scores['stance'] == 'Cautious' else typer.colors.YELLOW))
+    if out:
+        with open(out, "w", encoding="utf-8") as fh:
+            fh.write(generate_narrative(r))
+        typer.echo(f"  analyst note → {out}")
+
+
+@app.command()
 def serve(host: str = "127.0.0.1", port: int = 8000) -> None:
     """Run the FastAPI dashboard/API locally (uvicorn)."""
     import uvicorn
