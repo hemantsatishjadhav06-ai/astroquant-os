@@ -101,7 +101,11 @@ prior), and a **backtest verdict** that honestly states whether astro+Gann add r
 A synthesized **stance** (Constructive / Neutral / Cautious) leans on the evidence-based technical core.
 An **LLM analyst narrative** is generated when `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` is set in the
 environment (model via `AQ_LLM_MODEL`); otherwise a strong built-in narrative is used — **no keys in code**.
-Runs over a curated NSE universe (NIFTY-50 + indices) that's extensible to the full exchange.
+Runs over the **full Indian instrument universe** — every **NSE** equity (~2,372) + every **BSE** equity
+(~4,898) + **MCX** commodity futures (~7,300 instruments), bundled from the official exchange masters in
+`python/astroquant/universe/data/` (refresh with `scripts/fetch_universe.py`). Each instrument resolves to
+its correct free Yahoo ticker (`SYMBOL.NS`, `<scrip_code>.BO`, or an MCX commodity proxy like `GC=F`), so
+data is fetched lazily per symbol. The universe is searchable via `GET /universe?q=&exchange=&limit=`.
 UI: the **📈 Stock Deep Dive** tab. API: `GET /universe`, `POST /stock/analyze`. CLI: `astroquant stock --symbol RELIANCE --out note.md`.
 
 ## Options Greeks Engine (Δ / Θ / Γ)
@@ -185,7 +189,9 @@ export AQ_DB_URL="sqlite:///astroquant.db"   # omit to use the same; set a postg
 | **Options Greeks Engine (Δ/Θ/Γ)** — vol regime → structure → risk-sized intents + options backtest | ✅ tested | `strategies/options_greeks/` |
 | **Unified 5-tab dashboard** (Lab · Genome · Fund · Stock · Options) with inline-SVG charts | ✅ tested | `api/dashboard.py` |
 
-**Test status:** 86/86 passing. Highlights:
+**Universe:** ~7,300 instruments — NSE (2,372) + BSE (4,898) + MCX (14) + indices, bundled from official masters.
+
+**Test status:** 87/87 passing. Highlights:
 - astronomy positions verified vs published Vedic ephemeris for 2024-01-01 (Jupiter in Aries, Saturn
   in Aquarius, Rahu in Pisces, Mercury retrograde);
 - Gann Square-of-Nine verified against closed-form values (base 144 → 360° = 196, 180° = 169);
