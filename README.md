@@ -37,6 +37,12 @@ PYTHONPATH=python python3 -m astroquant.cli lab --symbols NIFTY,RELIANCE --sourc
 
 # 6) Serve the live web dashboard + API (http://127.0.0.1:8000):
 pip install -e ".[api,data]" && astroquant serve
+
+# 7) Market Genome Project (Idea 2) — knowledge discovery → research note + knowledge graph
+PYTHONPATH=python python3 -m astroquant.cli genome --symbol NIFTY --source nse --out genome_NIFTY.md
+
+# 8) Self-Evolving Hedge Fund (Idea 3) — evolve strategies → validate → paper portfolio
+PYTHONPATH=python python3 -m astroquant.cli fund --symbol NIFTY --source nse --generations 5
 ```
 
 ## The Autonomous Alpha Discovery Lab (Idea 1)
@@ -59,6 +65,25 @@ The **FastAPI service** (`python/astroquant/api/app.py`) exposes a live dashboar
 watch the leaderboard), plus `/lab/run`, `/discoveries`, `/astro/{date}`, `/healthz`.
 Deploy it on Render in minutes — see [`DEPLOY.md`](DEPLOY.md) and [`render.yaml`](render.yaml).
 **Secrets (broker/API keys) go in env vars only — never in code or git.**
+
+## Market Genome Project (Idea 2) & Self-Evolving Hedge Fund (Idea 3)
+
+**Idea 2 — Market Genome** (`python/astroquant/genome/`): knowledge discovery, not trading. Runs a
+battery of relationship studies (*Does Moon illumination affect volatility? Do Gann cycles predict
+reversals? Does Mercury retrograde shift returns?*), each with a permutation p-value and a batch-wide
+FDR correction, then builds a **knowledge graph** + an auto-generated **research note** (Markdown +
+Mermaid). Method-control studies (RSI, weekday, momentum) keep the battery's sensitivity visible.
+API: `POST /genome/run`. CLI: `astroquant genome --out note.md`.
+
+**Idea 3 — Self-Evolving Hedge Fund** (`python/astroquant/fund/`): an evolutionary search over
+strategy genomes (which feature families, decision band, regularisation). Fitness is the **post-cost
+Deflated Sharpe, deflated by the number of strategies tried**, so breeding thousands of variants
+raises the bar rather than guaranteeing a winner. The evolved winner is then **re-validated by the
+rigorous research engine** before a paper portfolio + risk report (Sharpe, DSR, max-DD, VaR, exposure)
+is produced. **Deploy = paper only (G5 gate); no live orders, ever.** This is the platform's sharpest
+lesson in code: a strategy can look spectacular in the evolution slice (e.g. +65%, Sharpe 1.1) and
+still be graded **no-edge** once walk-forward + multiple-testing correction is applied.
+API: `POST /fund/evolve`. CLI: `astroquant fund --generations 5`.
 
 The research engine answers **RQ-004** — *do astro + Gann features add out-of-sample, post-cost
 predictive power beyond technical + market features for next-day NIFTY direction?* — and prints an
@@ -115,8 +140,10 @@ export AQ_DB_URL="sqlite:///astroquant.db"   # omit to use the same; set a postg
 | **Discovery Lab** (Collect→Hypotheses→Backtest→Validate→Rank→Learn→Repeat; global comparison denominator) | ✅ tested, runs on live data | `lab/` |
 | **FastAPI service + live dashboard** (`/`, `/lab/run`, `/discoveries`, `/astro`, `/healthz`) | ✅ tested | `api/app.py` |
 | **Render-deployable** (`render.yaml`, `Dockerfile`, secrets via env only) | ✅ | `render.yaml`, `Dockerfile`, `DEPLOY.md` |
+| **Market Genome Project (Idea 2)** — relationship studies → knowledge graph + research note | ✅ tested | `genome/` |
+| **Self-Evolving Hedge Fund (Idea 3)** — evolutionary search → validate → gated paper portfolio | ✅ tested | `fund/` |
 
-**Test status:** 55/55 passing. Highlights:
+**Test status:** 64/64 passing. Highlights:
 - astronomy positions verified vs published Vedic ephemeris for 2024-01-01 (Jupiter in Aries, Saturn
   in Aquarius, Rahu in Pisces, Mercury retrograde);
 - Gann Square-of-Nine verified against closed-form values (base 144 → 360° = 196, 180° = 169);
