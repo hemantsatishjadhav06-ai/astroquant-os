@@ -89,8 +89,27 @@ class _YahooBackedIndiaSource:
     def __init__(self, fallback_synthetic: bool = True) -> None:
         self.fallback_synthetic = fallback_synthetic
 
+    def _resolve(self, symbol: str) -> str:
+        # Resolve to the exact Yahoo ticker via the bundled universe (BSE → <code>.BO, MCX → proxy);
+        # fall back to the naive .NS/.BO mapping for unknown symbols.
+        try:
+            from astroquant.universe import resolve_yahoo
+            yq = resolve_yahoo(symbol, self.exchange)
+            if yq and yq != symbol:
+                return yq
+        except Exception:  # noqa: BLE001
+            pass
+        return to_yahoo_symbol(symbol, self.exchange)
+
     def history(self, symbol: str, interval: str, start: date, end: date) -> list[Bar]:
-        yq = to_yahoo_symbol(symbol, self.exchange)
+        yq = self._resolve(symbol)
+        if not yq:                                          # e.g. an MCX commodity with no free proxy
+            if not self.fallback_synthetic:
+                raise ValueError(f"no Yahoo ticker for {symbol}")
+            syn = SyntheticSource().history(symbol, interval, start, end)
+            for b in syn:
+                b.source = f"{self.name}:synthetic"
+            return syn
         try:
             bars = parse_yahoo_chart(symbol, interval, self.name, _fetch_yahoo(yq, interval, start, end))
             if bars:
@@ -115,6 +134,13 @@ class NSESource(_YahooBackedIndiaSource):
 
 
 class BSESource(_YahooBackedIndiaSource):
-    """Bombay Stock Exchange — free EOD/intraday via Yahoo (.BO)."""
+    """Bombay Stock Exchange — free EOD/intraday via Yahoo (<scrip_code>.BO)."""
     exchange = "BSE"
     name = "bse"
+
+
+class MCXSource(_YahooBackedIndiaSource):
+    """Multi Commodity Exchange — commodity futures via Yahoo global-commodity proxies (GC=F, CL=F, …).
+    Commodities without a free proxy fall back to the deterministic synthetic source."""
+    exchange = "MCX"
+    name = "mcx"
