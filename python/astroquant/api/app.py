@@ -115,14 +115,20 @@ def fund_evolve(
 
 
 @app.get("/universe")
-def universe() -> dict:
-    """The stock universe (curated NSE catalog) + sector map."""
-    from astroquant.universe import list_sectors, load_universe
+def universe(
+    q: str = Query("", description="search symbol or name"),
+    exchange: str = Query("", pattern="^(NSE|BSE|MCX|INDEX|)$"),
+    limit: int = Query(50, ge=1, le=500),
+) -> dict:
+    """Full Indian instrument universe (NSE + BSE + MCX), searchable. Returns counts + matches."""
+    from astroquant.universe import search, universe_stats
 
+    matches = search(q, exchange or None, limit)
     return {
+        "stats": universe_stats(),
+        "count": len(matches),
         "stocks": [{"symbol": m.symbol, "name": m.name, "sector": m.sector,
-                    "exchange": m.exchange, "yahoo": m.yahoo} for m in load_universe()],
-        "sectors": list_sectors(),
+                    "exchange": m.exchange, "yahoo": m.yahoo_ticker} for m in matches],
     }
 
 

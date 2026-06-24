@@ -191,11 +191,13 @@ DASHBOARD_HTML = r"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/
  <section class="panel" id="p-stock">
    <div class="card">
      <div class="controls">
-       <div><label>Symbol</label><input id="s-symbol" list="s-list" value="RELIANCE" size="14"/>
+       <div><label>Symbol <span class="muted" id="uni-count"></span></label>
+         <input id="s-symbol" list="s-list" value="RELIANCE" size="14" autocomplete="off"
+                oninput="searchUniverse('s-list',this.value)"/>
          <datalist id="s-list"></datalist></div>
        <div><label>Source</label><select id="s-source">
          <option value="nse">NSE · live</option><option value="bse">BSE · live</option>
-         <option value="synthetic">Synthetic</option></select></div>
+         <option value="mcx">MCX · commodity</option><option value="synthetic">Synthetic</option></select></div>
        <div><label>History (years)</label><input id="s-years" type="number" value="6" min="2" max="12" style="width:74px"/></div>
        <button class="btn" id="s-btn" onclick="runStock()">Deep dive ▶</button>
      </div>
@@ -421,8 +423,13 @@ async function runOptBacktest(){busy(true,'o-bt','o-spin');try{
   $('ob-regime').innerHTML=kv(Object.keys(d.by_regime).map(function(k){return [k,d.by_regime[k].trades+' trades · ₹'+d.by_regime[k].pnl.toLocaleString('en-IN')]}));
 }catch(e){alert('Options backtest failed: '+e)}finally{busy(false,'o-bt','o-spin')}}
 
-async function loadUniverse(){try{var r=await fetch('/universe');var d=await r.json();
-  $('s-list').innerHTML=d.stocks.map(function(x){return '<option value="'+x.symbol+'">'+x.name+' · '+x.sector+'</option>'}).join('');}catch(e){}}
+function fillList(id,stocks){$(id).innerHTML=stocks.map(function(x){return '<option value="'+x.symbol+'">'+x.name+' · '+x.exchange+'</option>'}).join('');}
+async function searchUniverse(listId,q){try{var r=await fetch('/universe?limit=50&q='+encodeURIComponent(q||''));var d=await r.json();fillList(listId,d.stocks);}catch(e){}}
+async function loadUniverse(){try{var r=await fetch('/universe?limit=80');var d=await r.json();
+  fillList('s-list',d.stocks);
+  if(d.stats){var s=d.stats.by_exchange||{};var c=$('uni-count');
+    if(c)c.textContent='· '+(d.stats.total||0).toLocaleString('en-IN')+' instruments (NSE '+(s.NSE||0)+' · BSE '+(s.BSE||0)+' · MCX '+(s.MCX||0)+')';}
+}catch(e){}}
 window.addEventListener('load',loadUniverse);
 </script>
 </body></html>"""
