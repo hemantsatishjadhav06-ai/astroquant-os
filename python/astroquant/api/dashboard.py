@@ -78,6 +78,7 @@ DASHBOARD_HTML = r"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/
    <button class="tab" data-t="genome" onclick="tab('genome')">🧬 Market Genome</button>
    <button class="tab" data-t="fund" onclick="tab('fund')">🤖 Evolving Fund</button>
    <button class="tab" data-t="stock" onclick="tab('stock')">📈 Stock Deep Dive</button>
+   <button class="tab" data-t="options" onclick="tab('options')">⚡ Options Greeks</button>
  </div>
 
  <!-- ===================== LAB ===================== -->
@@ -227,6 +228,63 @@ DASHBOARD_HTML = r"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/
    </div>
  </section>
 
+ <!-- ===================== OPTIONS GREEKS ===================== -->
+ <section class="panel" id="p-options">
+   <div class="card">
+     <div class="controls">
+       <div><label>Symbol</label><input id="o-symbol" value="NIFTY" size="12"/></div>
+       <div><label>Source</label><select id="o-source">
+         <option value="synthetic">Synthetic · instant</option>
+         <option value="nse">NSE · live</option><option value="bse">BSE · live</option></select></div>
+       <div><label>Capital ₹</label><input id="o-capital" type="number" value="1000000" style="width:120px"/></div>
+       <div><label>Risk %/trade</label><input id="o-risk" type="number" step="0.5" value="1.5" style="width:90px"/></div>
+       <div><label>Expiry final hr</label><select id="o-final"><option value="false">No</option><option value="true">Yes (Γ-cliff)</option></select></div>
+       <button class="btn" id="o-btn" onclick="runOptions()">Generate signal ▶</button>
+       <button class="btn" id="o-bt" style="background:#1c2748" onclick="runOptBacktest()">Backtest</button>
+     </div>
+     <div class="flow">signal (dir+conviction) + IV-rank → vol regime → structure → worst-case-gap sizing → order intents. <b>You cannot be long Gamma AND long Theta.</b></div>
+     <div class="spin" id="o-spin"><div class="dot"></div><span>Reading vol regime, picking structure, sizing risk…</span></div>
+   </div>
+   <div id="o-out" style="display:none">
+     <div class="card">
+       <div class="stratcard">
+         <div id="o-side-emoji" style="font-size:30px">⚡</div>
+         <div style="flex:1"><div id="o-action" style="font-size:18px;font-weight:700"></div>
+           <div class="muted" id="o-trigger" style="font-size:12px"></div></div>
+         <div id="o-regime"></div>
+         <div class="gate">PAPER ONLY</div>
+       </div>
+       <div class="kpis">
+         <div class="kpi"><b id="o-d">–</b><span>net Δ (delta)</span></div>
+         <div class="kpi"><b id="o-g">–</b><span>net Γ (gamma)</span></div>
+         <div class="kpi"><b id="o-t">–</b><span>net Θ/day (theta)</span></div>
+         <div class="kpi"><b id="o-v">–</b><span>net Vega</span></div>
+         <div class="kpi"><b id="o-lots">–</b><span>lots (worst-case sized)</span></div>
+       </div>
+     </div>
+     <div class="grid2">
+       <div class="card"><h3>Order intents</h3><table><thead><tr><th>Action</th><th>Instrument</th><th>Lots</th><th>Est. premium</th></tr></thead><tbody id="o-intents"></tbody></table></div>
+       <div class="card"><h3>Risk &amp; exits</h3><div id="o-risk-tbl"></div></div>
+     </div>
+     <div class="note" id="o-note"></div>
+   </div>
+   <div id="o-bt-out" style="display:none">
+     <div class="card"><div class="kpis">
+       <div class="kpi"><b id="ob-ret">–</b><span>net return (post-cost)</span></div>
+       <div class="kpi"><b id="ob-trades">–</b><span>trades</span></div>
+       <div class="kpi"><b id="ob-win">–</b><span>win rate</span></div>
+       <div class="kpi"><b id="ob-dd">–</b><span>max drawdown</span></div>
+       <div class="kpi"><b id="ob-tail">–</b><span>tail loss (worst 1%)</span></div>
+       <div class="kpi"><b id="ob-cap">–</b><span>realized-vs-implied capture</span></div>
+     </div></div>
+     <div class="grid2">
+       <div class="card"><h3>Equity curve (post-cost)</h3><div id="ob-eq"></div></div>
+       <div class="card"><h3>P&amp;L by vol regime</h3><div id="ob-regime"></div></div>
+     </div>
+     <div class="note">Synthetic-IV backtest with the India options cost stack and no look-ahead. A losing NEUTRAL bucket is the expected truth: directional debit-spreads bleed Theta in chop. Validate on real per-strike IV before any capital.</div>
+   </div>
+ </section>
+
  <footer>AstroQuant OS · research platform only · Swiss Ephemeris isolated behind the astronomy collector · nothing is assumed true, everything is tested.</footer>
 </div>
 <script>
@@ -336,6 +394,32 @@ async function runStock(){busy(true,'s-btn','s-spin');try{
   $('s-nsrc').textContent='· '+(d.narrative_source||'built-in');
   $('s-narr').innerHTML=md(d.narrative);
 }catch(e){alert('Stock analysis failed: '+e)}finally{busy(false,'s-btn','s-spin')}}
+
+async function runOptions(){busy(true,'o-btn','o-spin');try{
+  var q=new URLSearchParams({symbol:$('o-symbol').value,source:$('o-source').value,capital:$('o-capital').value,risk_pct:($('o-risk').value/100),final_hour:$('o-final').value});
+  var d=await call('/options/signal?'+q);$('o-out').style.display='block';
+  var seller=d.action.indexOf('SELL')===0, none=d.action.indexOf('NO TRADE')>=0;
+  $('o-side-emoji').textContent=none?'⛔':(seller?'🔻':'🟢');
+  $('o-action').textContent=d.action; $('o-trigger').textContent=d.trigger;
+  var rb={CHEAP:'b-edge',RICH:'b-cond',NEUTRAL:'b-no'}[d.regime]||'b-no';
+  $('o-regime').innerHTML='<span class="badge '+rb+'">'+d.regime+' · IVrank '+(d.iv_rank*100).toFixed(0)+'%</span>';
+  var g=d.position_greeks;
+  $('o-d').textContent=g.delta;$('o-g').textContent=g.gamma;$('o-t').textContent=g.theta_day;$('o-v').textContent=g.vega_pt;$('o-lots').textContent=d.sizing.lots;
+  $('o-intents').innerHTML=d.order_intents.map(function(it){return '<tr><td><span class="badge '+(it.action==='BUY'?'b-edge':'b-cond')+'">'+it.action+'</span></td><td>'+it.instrument+'</td><td>'+it.lots+'</td><td>₹'+it.est_premium+'</td></tr>'}).join('')||'<tr><td colspan="4" class="muted">no legs — risk cap too small for one lot</td></tr>';
+  $('o-risk-tbl').innerHTML=kv([['Worst-case loss / lot','₹'+d.sizing.worst_case_per_lot.toLocaleString('en-IN')],['Risk cap (per trade)','₹'+d.sizing.risk_cap.toLocaleString('en-IN')],['Total worst-case','₹'+d.sizing.total_worst_case.toLocaleString('en-IN')],['Overnight gap assumed',(d.sizing.gap_pct*100)+'%'],['Net debit/credit','₹'+d.decision.structure.net_debit],['Structure max loss','₹'+d.decision.structure.max_loss.toLocaleString('en-IN')],['Gates',(d.decision.gate_failures||[]).join('; ')||'✓ all passed']]);
+  var ex=Object.keys(d.exits).map(function(k){return '<b>'+k+'</b>: '+d.exits[k]}).join('<br>');
+  $('o-note').innerHTML='<b>Exit logic (Greek-based, not P&L):</b><br>'+ex+'<br><br><span class="muted">'+d.note+'</span>';
+}catch(e){alert('Options signal failed: '+e)}finally{busy(false,'o-btn','o-spin')}}
+
+async function runOptBacktest(){busy(true,'o-bt','o-spin');try{
+  var q=new URLSearchParams({symbol:$('o-symbol').value,source:($('o-source').value==='nse'?'synthetic':$('o-source').value),years:6});
+  var d=await call('/options/backtest?'+q);$('o-bt-out').style.display='block';
+  $('ob-ret').innerHTML=pct(d.total_return);$('ob-trades').textContent=d.n_trades;
+  $('ob-win').textContent=(d.win_rate*100).toFixed(0)+'%';$('ob-dd').textContent=(d.max_drawdown*100).toFixed(1)+'%';
+  $('ob-tail').textContent='₹'+d.tail_loss_1pct.toLocaleString('en-IN');$('ob-cap').textContent=(d.realized_vs_implied_capture*100).toFixed(0)+'%';
+  $('ob-eq').innerHTML=lineSVG(d.equity_curve,{base:d.equity_curve[0]});
+  $('ob-regime').innerHTML=kv(Object.keys(d.by_regime).map(function(k){return [k,d.by_regime[k].trades+' trades · ₹'+d.by_regime[k].pnl.toLocaleString('en-IN')]}));
+}catch(e){alert('Options backtest failed: '+e)}finally{busy(false,'o-bt','o-spin')}}
 
 async function loadUniverse(){try{var r=await fetch('/universe');var d=await r.json();
   $('s-list').innerHTML=d.stocks.map(function(x){return '<option value="'+x.symbol+'">'+x.name+' · '+x.sector+'</option>'}).join('');}catch(e){}}

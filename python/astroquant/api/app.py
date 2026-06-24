@@ -144,6 +144,58 @@ def stock_analyze(
     return JSONResponse(out)
 
 
+@app.post("/options/signal")
+def options_signal(
+    symbol: str = Query("NIFTY"),
+    source: str = Query("nse", pattern="^(nse|bse|synthetic|yfinance)$"),
+    capital: float = Query(1_000_000.0, ge=50_000, le=1_000_000_000),
+    risk_pct: float = Query(0.015, ge=0.001, le=0.1),
+    live_chain: bool = Query(False),
+    final_hour: bool = Query(False),
+) -> JSONResponse:
+    """Options Greeks Engine: current vol regime → structure → risk-sized order intents + triggers."""
+    from astroquant.strategies.options_greeks import generate_options_signal
+
+    sig = generate_options_signal(symbol, source=source, capital=capital, risk_pct=risk_pct,
+                                  live_chain=live_chain, final_hour=final_hour)
+    return JSONResponse(sig.to_dict())
+
+
+@app.post("/options/backtest")
+def options_backtest(
+    symbol: str = Query("NIFTY"),
+    source: str = Query("synthetic", pattern="^(nse|bse|synthetic|yfinance)$"),
+    years: int = Query(6, ge=2, le=12),
+) -> JSONResponse:
+    """Backtest the options strategy (weekly cycles, costs included) → §11 metrics."""
+    from astroquant.strategies.options_greeks.backtest import run_options_backtest
+
+    return JSONResponse(run_options_backtest(symbol, source=source, years=years).to_dict())
+
+
+@app.get("/options/chain")
+def options_chain(
+    symbol: str = Query("NIFTY"),
+    source: str = Query("nse", pattern="^(nse|bse|synthetic|yfinance)$"),
+    live: bool = Query(True),
+) -> JSONResponse:
+    """Collect the option chain (live NSE when reachable, else synthetic) with Greeks per strike."""
+    from astroquant.collectors.sources.market_sources import get_source
+    from astroquant.strategies.options_greeks.chain import get_chain
+
+    spot = None
+    if not live or source != "nse":
+        kw = {"fallback_synthetic": True} if source in ("nse", "bse") else {}
+        bars = get_source(source, **kw).history(symbol, "1d",
+                                                __import__("datetime").date(2024, 1, 1),
+                                                __import__("datetime").date.today())
+        spot = bars[-1].close if bars else 20000.0
+    chain = get_chain(symbol, spot, live=(live and source == "nse"))
+    d = chain.to_dict()
+    d["quotes"] = d["quotes"][:24]  # trim payload
+    return JSONResponse(d)
+
+
 @app.get("/", response_class=HTMLResponse)
 def home() -> str:
     return DASHBOARD_HTML

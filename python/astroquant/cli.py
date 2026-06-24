@@ -177,6 +177,35 @@ def stock(symbol: str = "RELIANCE", source: str = "nse", years: int = 6, out: st
 
 
 @app.command()
+def options(
+    symbol: str = "NIFTY", source: str = "nse", capital: float = 1_000_000.0,
+    risk: float = 1.5, live_chain: bool = False, backtest: bool = False,
+) -> None:
+    """Options Greeks Engine: vol regime → structure → risk-sized order intents (+ optional backtest)."""
+    from astroquant.strategies.options_greeks import generate_options_signal
+
+    sig = generate_options_signal(symbol, source=source, capital=capital,
+                                  risk_pct=risk / 100.0, live_chain=live_chain)
+    typer.secho(f"\n  ▶ {sig.action}", fg=typer.colors.GREEN, bold=True)
+    typer.echo(f"    {sig.trigger}")
+    typer.echo(f"    regime={sig.regime}  IVrank={sig.iv_rank:.2f}  spot=₹{sig.spot:,}  chain={sig.chain_source}")
+    g = sig.position_greeks
+    typer.echo(f"    net Greeks  Δ={g['delta']}  Γ={g['gamma']}  Θ/day={g['theta_day']}  Vega={g['vega_pt']}")
+    typer.echo(f"    sizing: {sig.sizing['lots']} lot(s), worst-case ₹{sig.sizing['worst_case_per_lot']:,.0f}/lot "
+               f"(cap ₹{sig.sizing['risk_cap']:,.0f})")
+    for it in sig.order_intents:
+        typer.echo(f"      {it['action']:<4} {it['instrument']}  × {it['lots']} lots @ ₹{it['est_premium']}")
+    if backtest:
+        from astroquant.strategies.options_greeks.backtest import run_options_backtest
+        src = "synthetic" if source in ("nse", "bse") else source
+        bt = run_options_backtest(symbol, source=src)
+        typer.echo(f"\n    backtest: {bt.n_trades} trades, net ₹{bt.net_pnl:,.0f} ({bt.total_return*100:+.1f}%), "
+                   f"win {bt.win_rate*100:.0f}%, maxDD {bt.max_drawdown*100:.1f}%, "
+                   f"vol-capture {bt.realized_vs_implied_capture*100:.0f}%")
+    typer.secho("    research/paper only — intents are not sent to any broker.", fg=typer.colors.BLUE)
+
+
+@app.command()
 def serve(host: str = "127.0.0.1", port: int = 8000) -> None:
     """Run the FastAPI dashboard/API locally (uvicorn)."""
     import uvicorn
