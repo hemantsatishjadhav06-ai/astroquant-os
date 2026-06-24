@@ -1,0 +1,15 @@
+symbol,name,yahoo
+GOLD,Gold,GC=F
+SILVER,Silver,SI=F
+CRUDEOIL,Crude Oil,CL=F
+NATURALGAS,Natural Gas,NG=F
+COPPER,Copper,HG=F
+ZINC,Zinc,
+ALUMINIUM,Aluminium,ALI=F
+LEAD,Lead,
+NICKEL,Nickel,
+COTTON,Cotton,CT=F
+MENTHAOIL,Mentha Oil,
+GOLDM,Gold Mini,GC=F
+SILVERM,Silver Mini,SI=F
+CRUDEOILM,Crude Oil Mini,CL=F
