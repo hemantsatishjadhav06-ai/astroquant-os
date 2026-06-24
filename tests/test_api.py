@@ -18,7 +18,30 @@ def test_healthz():
 def test_dashboard_served():
     r = client.get("/")
     assert r.status_code == 200
-    assert "Discovery Lab" in r.text and "<svg" not in r.text[:50]  # it's the HTML page
+    # the unified 3-tab dashboard
+    for marker in ("Discovery Lab", "Market Genome", "Evolving Fund"):
+        assert marker in r.text
+
+
+def test_genome_endpoint():
+    r = client.post("/genome/run", params={
+        "symbol": "NIFTY", "source": "synthetic", "start": "2019-01-01", "end": "2022-12-31"})
+    assert r.status_code == 200
+    d = r.json()
+    assert d["n_studies"] == 10
+    assert "graph" in d and "edges" in d["graph"]
+    assert d["mermaid"].startswith("graph LR")
+
+
+def test_fund_endpoint():
+    r = client.post("/fund/evolve", params={
+        "symbol": "NIFTY", "source": "synthetic", "start": "2018-01-01", "end": "2022-12-31",
+        "generations": 3, "pop": 6})
+    assert r.status_code == 200
+    d = r.json()
+    assert d["evolution"]["n_evaluated"] > 0
+    assert d["risk"]["deploy_gate"].startswith("PAPER ONLY")
+    assert len(d["risk"]["equity_curve"]) > 0
 
 
 def test_astro_endpoint():
