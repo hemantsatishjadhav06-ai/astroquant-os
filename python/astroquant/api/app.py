@@ -150,6 +150,19 @@ def stock_analyze(
     return JSONResponse(out)
 
 
+@app.get("/chart")
+def chart(
+    symbol: str = Query("RELIANCE"),
+    source: str = Query("nse", pattern="^(nse|bse|mcx|synthetic|yfinance)$"),
+    interval: str = Query("1d", pattern="^(1d|1wk|1mo)$"),
+    years: int = Query(2, ge=1, le=10),
+) -> JSONResponse:
+    """OHLC candles + technical indicators (SMA/EMA/Bollinger/RSI/MACD) + Gann levels for charting."""
+    from astroquant.analysis.chart import build_chart
+
+    return JSONResponse(build_chart(symbol, source=source, interval=interval, years=years))
+
+
 @app.post("/options/signal")
 def options_signal(
     symbol: str = Query("NIFTY"),
