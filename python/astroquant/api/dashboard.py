@@ -65,7 +65,10 @@ DASHBOARD_HTML = r"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/
  .gate{font-size:12px;font-weight:700;color:#0b1020;background:#fbbf24;border-radius:8px;padding:5px 10px}
  footer{color:#6f7ba5;font-size:12px;text-align:center;margin-top:26px}
  h3{font-size:13.5px;margin:2px 0 12px;color:#cdd7f5;text-transform:uppercase;letter-spacing:.5px}
-</style></head><body><div class="wrap">
+ .chk{display:flex;gap:6px;align-items:center;font-size:12px;color:var(--muted)}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+</head><body><div class="wrap">
  <header>
    <div class="brand"><div class="logo"></div>
      <div><h1>AstroQuant&nbsp;OS</h1><div class="tag">Scientifically testing astro · Gann · technical signals in Indian markets</div></div>
@@ -203,6 +206,19 @@ DASHBOARD_HTML = r"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/
      </div>
      <div class="flow">Technical + Gann + Astrology + Backtest, fused into one analyst view (LLM-narrated when a key is set).</div>
      <div class="spin" id="s-spin"><div class="dot"></div><span>Collecting data, computing transits, levels & backtest…</span></div>
+   </div>
+   <div class="card">
+     <div class="controls" style="margin-bottom:10px">
+       <h3 style="margin:0;flex:1">📉 Price chart — technical analysis</h3>
+       <div><label>Interval</label><select id="ch-int"><option value="1d">Daily</option><option value="1wk">Weekly</option></select></div>
+       <div><label>Range</label><select id="ch-yrs"><option value="1">1Y</option><option value="2" selected>2Y</option><option value="5">5Y</option></select></div>
+       <label class="chk"><input type="checkbox" id="ch-bb" checked/> Bollinger</label>
+       <label class="chk"><input type="checkbox" id="ch-gann" checked/> Gann S/R</label>
+       <button class="btn" id="ch-btn" onclick="renderChart()">Load chart ▶</button>
+     </div>
+     <div id="chart-main" style="height:380px;width:100%"></div>
+     <div id="chart-rsi" style="height:110px;width:100%;margin-top:2px"></div>
+     <div class="hint" id="chart-legend">Candlesticks · SMA20/50 · Bollinger(20,2) · Volume · RSI(14) · Gann support/resistance. Click “Load chart”.</div>
    </div>
    <div id="s-out" style="display:none">
      <div class="card">
@@ -395,7 +411,48 @@ async function runStock(){busy(true,'s-btn','s-spin');try{
   $('s-eq').innerHTML=(b.equity_curve&&b.equity_curve.length>1)?lineSVG(b.equity_curve,{base:b.equity_curve[0]}):'<div class="muted">backtest equity unavailable</div>';
   $('s-nsrc').textContent='· '+(d.narrative_source||'built-in');
   $('s-narr').innerHTML=md(d.narrative);
+  try{renderChart();}catch(e){}
 }catch(e){alert('Stock analysis failed: '+e)}finally{busy(false,'s-btn','s-spin')}}
+
+async function renderChart(){
+  var L=window.LightweightCharts;
+  if(!L){$('chart-legend').textContent='chart library not loaded (no internet?) — analysis still works.';return;}
+  try{
+    var q=new URLSearchParams({symbol:$('s-symbol').value,source:($('s-source').value==='synthetic'?'synthetic':$('s-source').value),interval:$('ch-int').value,years:$('ch-yrs').value});
+    var d=await (await fetch('/chart?'+q.toString())).json();
+    if(window._chs){window._chs.forEach(function(c){try{c.remove();}catch(e){}});}
+    window._chs=[];
+    var base={layout:{background:{color:'#0c1430'},textColor:'#9aa8c7',fontSize:11},
+      grid:{vertLines:{color:'#172038'},horzLines:{color:'#172038'}},
+      rightPriceScale:{borderColor:'#243056'},timeScale:{borderColor:'#243056',timeVisible:false},
+      crosshair:{mode:0},autoSize:true};
+    var em=$('chart-main'); em.innerHTML='';
+    var ch=L.createChart(em,base); window._chs.push(ch);
+    var candle=ch.addCandlestickSeries({upColor:'#34d399',downColor:'#f87171',borderVisible:false,wickUpColor:'#34d399',wickDownColor:'#f87171'});
+    candle.setData(d.candles);
+    var s20=ch.addLineSeries({color:'#7c5cff',lineWidth:2,priceLineVisible:false,lastValueVisible:false}); s20.setData(d.indicators.sma20);
+    var s50=ch.addLineSeries({color:'#3b82f6',lineWidth:2,priceLineVisible:false,lastValueVisible:false}); s50.setData(d.indicators.sma50);
+    if($('ch-bb').checked){
+      var bu=ch.addLineSeries({color:'#56608f',lineWidth:1,priceLineVisible:false,lastValueVisible:false}); bu.setData(d.indicators.bb_upper);
+      var bl=ch.addLineSeries({color:'#56608f',lineWidth:1,priceLineVisible:false,lastValueVisible:false}); bl.setData(d.indicators.bb_lower);
+    }
+    var vol=ch.addHistogramSeries({priceFormat:{type:'volume'},priceScaleId:'vol'});
+    ch.priceScale('vol').applyOptions({scaleMargins:{top:0.84,bottom:0}}); vol.setData(d.volume);
+    if($('ch-gann').checked){
+      (d.levels.resistances||[]).forEach(function(p){candle.createPriceLine({price:p,color:'#f87171',lineWidth:1,lineStyle:2,axisLabelVisible:true,title:'R'});});
+      (d.levels.supports||[]).forEach(function(p){candle.createPriceLine({price:p,color:'#34d399',lineWidth:1,lineStyle:2,axisLabelVisible:true,title:'S'});});
+    }
+    var er=$('chart-rsi'); er.innerHTML='';
+    var rc=L.createChart(er,base); window._chs.push(rc);
+    var rsi=rc.addLineSeries({color:'#fbbf24',lineWidth:2,priceLineVisible:false,lastValueVisible:true}); rsi.setData(d.indicators.rsi14);
+    rsi.createPriceLine({price:70,color:'#56608f',lineWidth:1,lineStyle:2,title:'70'});
+    rsi.createPriceLine({price:30,color:'#56608f',lineWidth:1,lineStyle:2,title:'30'});
+    var syncing=false;
+    function sync(a,b){a.timeScale().subscribeVisibleLogicalRangeChange(function(r){if(syncing||!r)return;syncing=true;try{b.timeScale().setVisibleLogicalRange(r);}catch(e){}syncing=false;});}
+    sync(ch,rc); sync(rc,ch); ch.timeScale().fitContent();
+    $('chart-legend').innerHTML='<b style="color:#7c5cff">— SMA20</b> · <b style="color:#3b82f6">— SMA50</b> · <span style="color:#56608f">Bollinger(20,2)</span> · <b style="color:#fbbf24">RSI(14)</b> · <span style="color:#f87171">Gann R</span>/<span style="color:#34d399">S</span> — '+d.symbol+' · '+d.source+' · '+d.n+' bars';
+  }catch(e){$('chart-legend').textContent='chart failed: '+e;}
+}
 
 async function runOptions(){busy(true,'o-btn','o-spin');try{
   var q=new URLSearchParams({symbol:$('o-symbol').value,source:$('o-source').value,capital:$('o-capital').value,risk_pct:($('o-risk').value/100),final_hour:$('o-final').value});

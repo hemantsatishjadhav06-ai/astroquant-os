@@ -32,11 +32,12 @@ def main() -> None:
     fund = c.post("/fund/evolve", params={"symbol": "NIFTY", "source": src, "start": "2018-01-01",
                                           "end": "2024-12-31", "generations": 5, "pop": 8}).json()
     stock = c.post("/stock/analyze", params={"symbol": "RELIANCE", "source": src, "years": 6}).json()
+    chart = c.get("/chart", params={"symbol": "RELIANCE", "source": src, "interval": "1d", "years": 2}).json()
     bt_src = "synthetic" if src in ("nse", "bse") else src
     opt_sig = c.post("/options/signal", params={"symbol": "NIFTY", "source": src}).json()
     opt_bt = c.post("/options/backtest", params={"symbol": "NIFTY", "source": bt_src, "years": 6}).json()
     universe = c.get("/universe").json()
-    data = json.dumps({"lab": lab, "genome": gen, "fund": fund, "stock": stock,
+    data = json.dumps({"lab": lab, "genome": gen, "fund": fund, "stock": stock, "chart": chart,
                        "options_signal": opt_sig, "options_bt": opt_bt, "universe": universe})
     inject = (
         "<script>window.__D=" + data + ";"
@@ -47,8 +48,10 @@ def main() -> None:
         "if(u.indexOf('/options/backtest')>=0)return window.__D.options_bt;"
         "if(u.indexOf('/options')>=0)return window.__D.options_signal;"
         "return window.__D.fund;};"
-        "var _f=window.fetch;window.fetch=function(u,o){if((''+u).indexOf('/universe')>=0)"
-        "return Promise.resolve({json:function(){return Promise.resolve(window.__D.universe)}});return _f(u,o);};"
+        "var _f=window.fetch;window.fetch=function(u,o){var s=''+u;"
+        "if(s.indexOf('/chart')>=0)return Promise.resolve({json:function(){return Promise.resolve(window.__D.chart)}});"
+        "if(s.indexOf('/universe')>=0)return Promise.resolve({json:function(){return Promise.resolve(window.__D.universe)}});"
+        "return _f(u,o);};"
         "window.addEventListener('load',function(){try{runLab();runGenome();runFund();runStock();runOptions();runOptBacktest();}catch(e){}});"
         "</script>"
     )
