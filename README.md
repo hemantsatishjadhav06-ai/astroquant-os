@@ -106,6 +106,10 @@ Runs over the **full Indian instrument universe** — every **NSE** equity (~2,3
 `python/astroquant/universe/data/` (refresh with `scripts/fetch_universe.py`). Each instrument resolves to
 its correct free Yahoo ticker (`SYMBOL.NS`, `<scrip_code>.BO`, or an MCX commodity proxy like `GC=F`), so
 data is fetched lazily per symbol. The universe is searchable via `GET /universe?q=&exchange=&limit=`.
+The Stock Deep Dive tab also ships an **interactive candlestick chart** for hands-on technical analysis
+(TradingView Lightweight Charts): OHLC candles + **SMA20/50, EMA, Bollinger(20,2), volume, a synced
+RSI(14) pane**, and the platform's **Gann support/resistance** levels drawn as price lines — interval
+(daily/weekly) and range selectable. API: `GET /chart` (candles + indicators + Gann levels).
 UI: the **📈 Stock Deep Dive** tab. API: `GET /universe`, `POST /stock/analyze`. CLI: `astroquant stock --symbol RELIANCE --out note.md`.
 
 ## Options Greeks Engine (Δ / Θ / Γ)
@@ -188,10 +192,11 @@ export AQ_DB_URL="sqlite:///astroquant.db"   # omit to use the same; set a postg
 | **Stock Deep Dive** — per-stock astro+technical+Gann+backtest + LLM narrative over a curated NSE universe | ✅ tested | `analysis/`, `universe/` |
 | **Options Greeks Engine (Δ/Θ/Γ)** — vol regime → structure → risk-sized intents + options backtest | ✅ tested | `strategies/options_greeks/` |
 | **Unified 5-tab dashboard** (Lab · Genome · Fund · Stock · Options) with inline-SVG charts | ✅ tested | `api/dashboard.py` |
+| **Interactive candlestick chart** (candles + SMA/EMA/Bollinger/RSI + volume + Gann levels) | ✅ tested | `analysis/chart.py`, `analysis/indicators.py` |
 
 **Universe:** ~7,300 instruments — NSE (2,372) + BSE (4,898) + MCX (14) + indices, bundled from official masters.
 
-**Test status:** 87/87 passing. Highlights:
+**Test status:** 93/93 passing. Highlights:
 - astronomy positions verified vs published Vedic ephemeris for 2024-01-01 (Jupiter in Aries, Saturn
   in Aquarius, Rahu in Pisces, Mercury retrograde);
 - Gann Square-of-Nine verified against closed-form values (base 144 → 360° = 196, 180° = 169);
